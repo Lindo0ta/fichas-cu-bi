@@ -1,0 +1,1204 @@
+import React, { useRef, useEffect, useState } from 'react';
+import { useObservatorio } from '../../hooks/useObservatorio';
+import { transformarPage1 } from '../../models/proyeccionPage1Model';
+import { transformarPage2 } from '../../models/proyeccionEsModel';
+import { useAnimatedRows } from '../../hooks/useAnimatedRows';
+
+// ─────────────────────────────────────────────
+// CONSTANTES DE COLOR
+// ─────────────────────────────────────────────
+export const BLUE       = '#012657';
+export const BLUE_LIGHT = '#C3E0FB';
+export const BLUE_MED   = '#AFC4D8';
+export const PURPLE     = '#C7B8E7';
+export const PURPLE2    = '#9977bd';
+export const RED_ROW    = '#FDEDEC';
+export const YELLOW     = '#FFFF99';
+export const GREEN_HDR  = '#C6EFCE';
+export const GRAY_BAN   = '#D9D9D9';
+
+export const STICKY_BG = '#EEF4FB';
+export const B = `0.5px solid #b8c8d8`;
+export const P = '3px 5px';
+
+// ─────────────────────────────────────────────
+// MAPA DE LÍDERES
+// ─────────────────────────────────────────────
+const NOMBRE_LIDER: Record<string, string> = {
+  'centro-engativa':               '',
+  'centro-kennedy':                'Edgar Germán Martínez',
+  'centro-santa-fe-las-cruces':    'Liliana Milena Castro Bastidas',
+  'centro-perdomo-ciudad-bolivar': 'Edgar Germán Martínez',
+  'centro-san-cristobal-usaquen':  'Edgar Alirio Aguirre Buenaventura',
+};
+
+// ─────────────────────────────────────────────
+// MAPAS DE IMÁGENES
+// ─────────────────────────────────────────────
+const MAPA_IMAGENES: Record<string, string> = {
+  'centro-engativa':               '/engativa.png',
+  'centro-kennedy':                '/Kennedy.png',
+  'centro-santa-fe-las-cruces':    '/cruces.png',
+  'centro-perdomo-ciudad-bolivar': '/perdomo.png',
+  'centro-san-cristobal-usaquen':  '/sancristobal.png',
+};
+const CONTEXTO_IMAGENES: Record<string, string> = {
+  'centro-engativa':               '/contexto-engativa.png',
+  'centro-kennedy':                '/contexto-kennedy.png',
+  'centro-santa-fe-las-cruces':    '/contexto-cruces.png',
+  'centro-perdomo-ciudad-bolivar': '/contexto-perdomo.png',
+  'centro-san-cristobal-usaquen':  '/contexto-sancristobal.png',
+};
+const EBITDA_IMAGENES: Record<string, string> = {
+  'centro-engativa':               '/ebitda_engativa.png',
+  'centro-kennedy':                '/ebitda_kennedy.png',
+  'centro-santa-fe-las-cruces':    '/ebitda_cruces.png',
+  'centro-perdomo-ciudad-bolivar': '/ebitda_perdomo.png',
+  'centro-san-cristobal-usaquen':  '/ebitda_usaquen.png',
+};
+
+// ─────────────────────────────────────────────
+// HELPERS DE ESTILO
+// ─────────────────────────────────────────────
+export const thBase = (
+  bg: string,
+  align: 'left' | 'center' | 'right' = 'center',
+  color = '#000',
+): React.CSSProperties => ({
+  border: B, backgroundColor: bg, color, fontWeight: 700,
+  fontSize: 9, textAlign: align, padding: P, whiteSpace: 'nowrap',
+});
+
+export const tdBase = (
+  align: 'left' | 'center' | 'right' = 'right',
+  bg = 'white',
+  bold = false,
+  color = '#000',
+): React.CSSProperties => ({
+  border: B, backgroundColor: bg, fontWeight: bold ? 700 : 400,
+  fontSize: 9, textAlign: align, padding: P, whiteSpace: 'nowrap', color,
+});
+
+// ─────────────────────────────────────────────
+// HOOK REVEAL
+// ─────────────────────────────────────────────
+function useInView(delay = 0) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setTimeout(() => setVisible(true), delay);
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.07 },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [delay]);
+  return { ref, visible };
+}
+
+// ─────────────────────────────────────────────
+// COMPONENTES BASE
+// ─────────────────────────────────────────────
+export function Reveal({
+  children,
+  delay = 0,
+  style = {},
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  style?: React.CSSProperties;
+}) {
+  const { ref, visible } = useInView(delay);
+  return (
+    <div
+      ref={ref}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(16px)',
+        transition: `opacity 0.5s ease ${delay}ms, transform 0.5s cubic-bezier(0.16,1,0.3,1) ${delay}ms`,
+        minWidth: 0,
+        width: '90%',
+        boxSizing: 'border-box',
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function MBanner({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      backgroundColor: GRAY_BAN,
+      clipPath: 'polygon(0.5% 0%, 100% 0%, 99.5% 100%, 0% 100%)',
+      padding: '4px 14px',
+      marginBottom: 6,
+    }}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: '#111', display: 'block', textAlign: 'center' }}>{children}</span>
+    </div>
+  );
+}
+
+export function Card({ children, mb = 10 }: { children: React.ReactNode; mb?: number }) {
+  return (
+    <div style={{
+      background: 'white',
+      borderRadius: 8,
+      padding: '10px',
+      marginBottom: mb,
+      border: `1.5px solid ${BLUE}`,
+      boxShadow: '0 2px 10px rgba(1,38,87,0.12)',
+      minWidth: 0,
+      width: '100%',
+      boxSizing: 'border-box',
+    }}>
+      {children}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// STICKY TABLE
+// ─────────────────────────────────────────────
+export function StickyScrollTable({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      className="scroll-table-wrap"
+      style={{
+        position: 'relative',
+        overflowX: 'auto',
+        overflowY: 'visible',
+        WebkitOverflowScrolling: 'touch' as any,
+        width: '100%',
+        display: 'block',
+      }}
+    >
+      <table style={{
+        borderCollapse: 'separate',
+        borderSpacing: 0,
+        tableLayout: 'auto',
+        whiteSpace: 'nowrap',
+        fontSize: 8,
+      }}>
+        {children}
+      </table>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// ESTILOS STICKY
+// ─────────────────────────────────────────────
+export const SC_P  = '2px 4px';
+export const SC_FS = 8;
+export const STICKY_W      = 90;
+export const STICKY_W1     = 36;
+export const STICKY_SHADOW = '3px 0 8px rgba(1,38,87,0.18)';
+
+export const scTd = (
+  align: 'left' | 'center' | 'right' = 'right',
+  bg = 'white',
+  bold = false,
+  color = '#000',
+): React.CSSProperties => ({
+  border: B, backgroundColor: bg, fontWeight: bold ? 700 : 400,
+  fontSize: SC_FS, textAlign: align, padding: SC_P,
+  whiteSpace: 'nowrap', color, position: 'relative', zIndex: 0,
+});
+
+export const stickyThBlock = (bg = STICKY_BG): React.CSSProperties => ({
+  border: B, backgroundColor: bg, fontWeight: 700, fontSize: SC_FS,
+  padding: 0, whiteSpace: 'nowrap', position: 'sticky', left: 0,
+  zIndex: 12, boxShadow: STICKY_SHADOW, minWidth: STICKY_W, width: STICKY_W,
+});
+
+export const stickyTdBlock = (
+  bg = STICKY_BG,
+  color = BLUE,
+): React.CSSProperties => ({
+  border: B, backgroundColor: bg, fontSize: SC_FS, padding: 0,
+  whiteSpace: 'nowrap', position: 'sticky', left: 0, zIndex: 11,
+  boxShadow: STICKY_SHADOW, minWidth: STICKY_W, width: STICKY_W,
+  verticalAlign: 'middle', color,
+});
+
+export function StickyInner({
+  nivel, modalidad,
+  nivelBg = STICKY_BG, nivelColor = BLUE,
+  modBg = STICKY_BG, modColor = BLUE, modBold = false,
+}: {
+  nivel?: React.ReactNode; modalidad?: React.ReactNode;
+  nivelBg?: string; nivelColor?: string;
+  modBg?: string; modColor?: string; modBold?: boolean;
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'stretch', height: '100%', minHeight: 22 }}>
+      {nivel !== undefined && (
+        <div style={{
+          width: STICKY_W1, minWidth: STICKY_W1, backgroundColor: nivelBg,
+          color: nivelColor, fontWeight: 700, fontSize: SC_FS, padding: SC_P,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          borderRight: `0.5px solid rgba(1,38,87,0.18)`,
+          textAlign: 'center', lineHeight: 1.2,
+        }}>
+          {nivel}
+        </div>
+      )}
+      <div style={{
+        flex: 1, backgroundColor: modBg, color: modColor,
+        fontWeight: modBold ? 700 : 0, fontSize: SC_FS,
+        padding: SC_P, display: 'flex', alignItems: 'center',
+      }}>
+        {modalidad}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// SUB-COMPONENTES DE TABLA
+// ─────────────────────────────────────────────
+const YEARS5 = ['2026', '2027', '2028', '2029', '2030'];
+
+function YC({ d, color = '#000', bg = 'white' }: {
+  d: { nuevos: string; continuos: string; totales: string };
+  color?: string; bg?: string;
+}) {
+  return (
+    <>
+      <td style={scTd('right', bg, false, color)}>{d.nuevos}</td>
+      <td style={scTd('right', bg, false, color)}>{d.continuos}</td>
+      <td style={scTd('right', bg, false, color)}>{d.totales}</td>
+    </>
+  );
+}
+
+const dataTh: React.CSSProperties = {
+  border: B, backgroundColor: BLUE_LIGHT, fontWeight: 700,
+  fontSize: SC_FS, textAlign: 'center', padding: SC_P,
+  position: 'relative', zIndex: 0,
+};
+
+function TableHead() {
+  return (
+    <thead>
+      <tr>
+        <th rowSpan={2} style={{ ...stickyThBlock(), verticalAlign: 'middle' }}>
+          <StickyInner nivel="Nivel" modalidad="Period." modBold />
+        </th>
+        {YEARS5.map((y) => <th key={y} colSpan={3} style={dataTh}>{y}</th>)}
+      </tr>
+      <tr>
+        {YEARS5.map((y) => (
+          <React.Fragment key={y}>
+            {['Nvo', 'Cont', 'Tot'].map((s) => (
+              <th key={s} style={{ ...dataTh, fontSize: 7 }}>{s}</th>
+            ))}
+          </React.Fragment>
+        ))}
+      </tr>
+    </thead>
+  );
+}
+
+function SeparatorRow() {
+  return (
+    <tr style={{ height: 3 }}>
+      <td colSpan={16} style={{ padding: 0, backgroundColor: BLUE_LIGHT, height: 3 }} />
+    </tr>
+  );
+}
+
+// ─────────────────────────────────────────────
+// CELDAS MATRÍCULAS 2026
+// ─────────────────────────────────────────────
+const FONT_D = '9px';
+const RED    = '#C00000';
+const GREEN2 = '#107C10';
+
+const mc = (align: 'left' | 'right' | 'center' = 'right', bg = 'white'): React.CSSProperties => ({
+  border: B, fontSize: FONT_D, padding: P, textAlign: align,
+  fontWeight: 400, backgroundColor: bg, color: '#000',
+});
+const mcY = (): React.CSSProperties => ({
+  border: B, fontSize: FONT_D, padding: P, textAlign: 'right',
+  fontWeight: 400, backgroundColor: YELLOW, color: '#000',
+});
+const mcT = (align: 'left' | 'right' | 'center' = 'right'): React.CSSProperties => ({
+  border: B, fontSize: FONT_D, padding: P, textAlign: align,
+  fontWeight: 700, backgroundColor: YELLOW, color: '#000',
+});
+
+function MatCells({ d, isTotalRow = false, isYellow = false }: {
+  d: any; isTotalRow?: boolean; isYellow?: boolean;
+}) {
+  if (!d || typeof d !== 'object')
+    return <><td style={mc()}>-</td><td style={mc()}>-</td><td style={mc()}>-</td><td style={mc()}>-</td></>;
+  const { proyectado = '-', matriculado = '-', variacion = '-', porcentaje = '-' } = d;
+  const colorVar = d.esPositivo ? GREEN2 : RED;
+  const colorPct = parseFloat(String(porcentaje)) >= 0 ? GREEN2 : RED;
+  return (
+    <>
+      <td style={isTotalRow ? mcT() : isYellow ? mcY() : mc()}>{proyectado}</td>
+      <td style={isTotalRow ? mcT() : isYellow ? mcY() : mc()}>{matriculado}</td>
+      <td style={{ ...(isTotalRow ? mcT() : mc()), color: colorVar }}>{variacion}</td>
+      <td style={{ ...(isTotalRow ? mcT() : mc()), color: colorPct }}>{porcentaje}</td>
+    </>
+  );
+}
+
+function DesercionChart({ data }: { data: any }) {
+  const toN = (v: any) => { const n = Number(v); return isNaN(n) ? 0 : n; };
+  const años = ['2026', '2027', '2028', '2029', '2030'];
+  const pres = (data.presencial || []).slice(0, 5).map(toN);
+  const dist = (data.distancia  || []).slice(0, 5).map(toN);
+  const maxVal = Math.max(...pres.map((p: number, i: number) => p + dist[i]), 1);
+
+  /*
+   * Viewbox más alto para que las etiquetas de año tengan banda propia
+   * pL ampliado para que no se corten los % en la barra izquierda
+   */
+  const W = 900, H = 440;
+  const pL = 30, pR = 30, pT = 30, pB = 80;
+  const plotW = W - pL - pR, plotH = H - pT - pB, base = pT + plotH;
+  const step = plotW / años.length, colW = step * 0.58, sc = plotH / maxVal;
+
+  // Banda de años bajo el eje X
+  const bandaY = base + 1;
+  const bandaH = pB - 16;
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet"
+      style={{ display: 'block', fontFamily: 'Inter, sans-serif' }}>
+
+      {/* Línea eje X */}
+      <line x1={pL} y1={base} x2={W - pR} y2={base} stroke="#888" strokeWidth="2" />
+
+      {/* Banda de fondo bajo el eje X para los años */}
+      <rect x={pL} y={bandaY} width={plotW} height={bandaH} fill="#f5f5f5" />
+
+      {años.map((y, i) => {
+        const cx = pL + i * step + step / 2;
+        const x  = cx - colW / 2;
+        const hP = pres[i] * sc;
+        const hD = dist[i] * sc;
+        return (
+          <g key={y}>
+            {/* Barra presencial */}
+            <rect x={x} y={base - hP}      width={colW} height={Math.max(hP, 1)} fill="#F5D97A" />
+            {/* Barra distancia encima */}
+            <rect x={x} y={base - hP - hD} width={colW} height={Math.max(hD, 1)} fill="#4A86C8" />
+
+            {/* Etiqueta % presencial — solo si hay espacio */}
+            {hP > 18 && (
+              <text x={cx} y={base - hP / 2}
+                textAnchor="middle" dominantBaseline="middle"
+                fontSize="22" fontWeight="bold" fill="#333">
+                {Math.round(pres[i])}%
+              </text>
+            )}
+            {/* Etiqueta % distancia */}
+            {hD > 18 && (
+              <text x={cx} y={base - hP - hD / 2}
+                textAnchor="middle" dominantBaseline="middle"
+                fontSize="22" fontWeight="bold" fill="white">
+                {Math.round(dist[i])}%
+              </text>
+            )}
+
+            {/* Año en la banda inferior */}
+            <text x={cx} y={bandaY + bandaH / 2}
+              textAnchor="middle" dominantBaseline="middle"
+              fontSize="22" fontWeight="600" fill="#444">
+              {y}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Leyenda centrada en la franja inferior bajo la banda */}
+      <rect x={W / 2 - 120} y={H - 14} width={13} height={9} fill="#F5D97A" />
+      <text x={W / 2 - 100} y={H - 7} fontSize="20" fill="#333" dominantBaseline="middle">Presencial</text>
+      <rect x={W / 2 + 50}  y={H - 14} width={13} height={9} fill="#4A86C8" />
+      <text x={W / 2 + 70}  y={H - 7} fontSize="20" fill="#333" dominantBaseline="middle">Distancia</text>
+    </svg>
+  );
+}
+
+function LineasChart({ data }: { data: any }) {
+  const años = ['2026', '2027', '2028', '2029', '2030'];
+  const series = [
+    { label: 'Profesional',     color: '#b8962e', bg: 'rgba(184,150,46,0.18)',  values: data.profesional     ?? [] },
+    { label: 'Maestría',        color: '#0088cc', bg: 'rgba(0,136,204,0.15)',   values: data.maestria        ?? [] },
+    { label: 'Especialización', color: '#c0143c', bg: 'rgba(192,20,60,0.13)',   values: data.especializacion ?? [] },
+    { label: 'Doctorado',       color: '#2e8b57', bg: 'rgba(46,139,87,0.13)',   values: data.doctorado       ?? [] },
+  ];
+
+  const W = 560, H = 340;
+  // padL ampliado para que los números del eje Y no se recorten
+  // padTop ampliado para etiquetas que suben por encima del plot
+  const padL = 72, padR = 16, padTop = 38, padBot = 62;
+  const plotW = W - padL - padR;
+  const plotH = H - padTop - padBot;
+  const base  = padTop + plotH;
+  const ticks = 4;
+
+  const allV = series.flatMap(s => (s.values || []).map(Number)).filter(v => !isNaN(v));
+  const maxV = Math.max(...allV, 1);
+
+  const xP = (i: number) => padL + (i / (años.length - 1)) * plotW;
+  const yP = (v: number) => padTop + plotH - (Number(v) / maxV) * plotH;
+
+  const areaPath = (values: any[]) => {
+    const pts = values.map((v, i) => `${xP(i)},${yP(Number(v))}`).join(' L ');
+    return `M ${pts} L ${xP(values.length - 1)},${base} L ${xP(0)},${base} Z`;
+  };
+
+  const linePath = (values: any[]) =>
+    values.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xP(i)},${yP(Number(v))}`).join(' ');
+
+  // Banda de años
+  const bandaY = base + 1;
+  const bandaH = 24;
+
+  // Leyenda — 2 filas de 2, debajo de la banda
+  const legY = bandaY + bandaH + 10;
+
+  return (
+    <svg
+      width="100%"
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="xMidYMid meet"
+      style={{ display: 'block', fontFamily: 'Inter, sans-serif' }}
+    >
+      {/* Gridlines horizontales */}
+      {Array.from({ length: ticks + 1 }).map((_, i) => {
+        const y   = padTop + (plotH / ticks) * i;
+        const val = Math.round(maxV - (maxV * i) / ticks);
+        return (
+          <g key={i}>
+            <line x1={padL} y1={y} x2={W - padR} y2={y} stroke="#e0e0e0" strokeWidth="1" />
+            <text
+              x={padL - 10}
+              y={y}
+              textAnchor="end"
+              dominantBaseline="middle"
+              fontSize="11"
+              fontWeight="500"
+              fill="#666"
+            >
+              {val.toLocaleString('es-CO')}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Gridlines verticales punteadas */}
+      {años.map((_, i) => (
+        <line
+          key={i}
+          x1={xP(i)} y1={padTop} x2={xP(i)} y2={base}
+          stroke="#ececec" strokeWidth="1" strokeDasharray="3,3"
+        />
+      ))}
+
+      {/* Eje Y */}
+      <line x1={padL} y1={padTop} x2={padL} y2={base} stroke="#bbb" strokeWidth="1.5" />
+      {/* Eje X */}
+      <line x1={padL} y1={base} x2={W - padR} y2={base} stroke="#999" strokeWidth="2" />
+
+      {/* Banda de fondo para los años */}
+      <rect x={padL} y={bandaY} width={plotW} height={bandaH} fill="#f5f5f5" />
+
+      {/* Áreas rellenas */}
+      {series.map((s) => (
+        <path key={`area-${s.label}`} d={areaPath(s.values)} fill={s.bg} stroke="none" />
+      ))}
+
+      {/* Líneas */}
+      {series.map((s) => (
+        <path
+          key={`line-${s.label}`}
+          d={linePath(s.values)}
+          fill="none"
+          stroke={s.color}
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      ))}
+
+      {/* Puntos y etiquetas */}
+      {series.map((s, si) =>
+        (s.values || []).map((v: any, i: number) => {
+          const vn = Number(v);
+          const cx = xP(i);
+          const cy = yP(vn);
+
+          const othersY = series
+            .filter((_, idx) => idx !== si)
+            .map(other => yP(Number((other.values || [])[i] ?? 0)));
+
+          const tooClose = othersY.some(oy => Math.abs(oy - cy) < 14);
+          const baseOff  = si % 2 === 0 ? -10 : 9;
+          const off      = tooClose ? (si < 2 ? -14 : 12) : baseOff;
+
+          // Clamp: si la etiqueta saldría del borde superior, empujar hacia abajo
+          const labelY  = cy + off;
+          const finalOff = labelY < padTop + 6 ? 9 : off;
+
+          return (
+            <g key={`${s.label}-${i}`}>
+              <circle cx={cx} cy={cy} r="3" fill="white" stroke={s.color} strokeWidth="1.5" />
+              {vn > 0 && (
+                <text
+                  x={cx}
+                  y={cy + finalOff}
+                  textAnchor="middle"
+                  fontSize="10"
+                  fontWeight="500"
+                  fill={s.color}
+                >
+                  {Math.round(vn).toLocaleString('es-CO')}
+                </text>
+              )}
+            </g>
+          );
+        })
+      )}
+
+      {/* Años en la banda inferior */}
+      {años.map((y, i) => (
+        <text
+          key={y}
+          x={xP(i)}
+          y={bandaY + bandaH / 2}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fontSize="11"
+          fontWeight="600"
+          fill="#444"
+        >
+          {y}
+        </text>
+      ))}
+
+      {/* Leyenda en 2 filas de 2 */}
+      {series.map((s, i) => {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const lx  = W / 2 - 120 + col * 130;
+        const ly  = legY + row * 16;
+        return (
+          <g key={`leg-${s.label}`}>
+            <rect x={lx} y={ly - 4} width={10} height={7} rx="2"
+              fill={s.bg} stroke={s.color} strokeWidth="1.5" />
+            <text x={lx + 14} y={ly + 1} fontSize="10" fill="#444" dominantBaseline="middle">
+              {s.label}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ─────────────────────────────────────────────
+// VISTA MÓVIL PRINCIPAL
+// ─────────────────────────────────────────────
+interface MobileContentProps { centroId: string; }
+
+export function MobileContent({ centroId }: MobileContentProps) {
+  const { data, loading, centroNombre } = useObservatorio(centroId);
+  const p1 = transformarPage1(data);
+  const p2 = transformarPage2(data);
+
+  const visibleIndicators = useAnimatedRows(centroId, p1.indicatorsRows.length, 80);
+  const visibleStudents   = useAnimatedRows(centroId, 3, 100);
+  const visibleT1         = useAnimatedRows(centroId, 7, 70);
+  const visibleT2         = useAnimatedRows(centroId, 3, 80);
+  const visibleT3         = useAnimatedRows(centroId, 7, 60);
+  const visibleT4         = useAnimatedRows(centroId, 7, 70);
+
+  const ss = p1.studentSummary ?? {
+    pregradoDistancia: '-', pregradoPresencial: '-', pregradoTotal: '-',
+    posgradoDistancia: '-', posgradoPresencial: '-', posgradoTotal: '-',
+    totalGeneralDistancia: '-', totalGeneralPresencial: '-', totalGeneral: '-',
+    hombres: '-', mujeres: '-',
+  };
+
+  const años6 = ['2024 LB', '2025', '2026', '2027', '2028', '2029', '2030 '];
+  const mapaSrc     = MAPA_IMAGENES[centroId]     || '/engativa.png';
+  const contextoSrc = CONTEXTO_IMAGENES[centroId] || '/contexto-engativa.png';
+  const ebitdaSrc   = EBITDA_IMAGENES[centroId]   || '/ebitda_engativa.png';
+  const subtitle    = `Centro Universitario ${centroNombre}`;
+  const lider       = NOMBRE_LIDER[centroId] || '';
+
+  const FullTable = ({ children, style = {} }: { children: React.ReactNode; style?: React.CSSProperties }) => (
+    <div style={{ width: '100%', overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', ...style }}>
+        {children}
+      </table>
+    </div>
+  );
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 0' }}>
+      <span style={{ color: '#999', fontSize: 13 }}>Cargando datos...</span>
+    </div>
+  );
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      width: '100%', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box',
+    }}>
+
+      {/* ══ HEADER PAGE 1 ══ */}
+      <Reveal delay={0}>
+        <Card mb={10}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <img src="/Logo UNIMINUTO.png" alt="Logo" style={{ height: 36, objectFit: 'contain' }} />
+            <div style={{ flex: 1, margin: '0 8px', overflow: 'hidden' }}>
+              <div style={{ backgroundColor: BLUE_LIGHT, clipPath: 'polygon(2% 0%,100% 0%,98% 100%,0% 100%)', padding: '4px 12px', textAlign: 'center' }}>
+                <span style={{ fontSize: 10, fontWeight: 600, color: BLUE, textAlign: 'center', lineHeight: 1.4 }}>
+                  Centro Universitario<br />
+                  {centroNombre}
+                </span>
+              </div>
+            </div>
+            <img src="/Logo_Acreditacion.png" alt="Acreditación" style={{ height: 30, objectFit: 'contain' }} />
+          </div>
+          <p style={{ textAlign: 'center', fontWeight: 700, fontSize: 12, color: '#222', margin: '8px 0 1px' }}>
+            Ficha Centro Universitario
+          </p>
+          <p style={{ textAlign: 'center', fontSize: 10, color: '#555', margin: 0 }}>
+            Líder: <strong style={{ color: BLUE }}>{lider}</strong>
+          </p>
+        </Card>
+      </Reveal>
+
+      {/* ══ MAPA ══ */}
+      <Reveal delay={60}>
+        <Card mb={10}>
+          <img src={mapaSrc} alt="Mapa centro"
+            style={{ width: '100%', display: 'block', objectFit: 'contain', maxHeight: 230 }} />
+        </Card>
+      </Reveal>
+
+      {/* ══ ESTUDIANTES 2026 S1-Q1 ══ */}
+      <Reveal delay={80}>
+        <Card mb={10}>
+          <MBanner>ESTUDIANTES CENTRO UNIVERSITARIO 2026 S1-Q1</MBanner>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+
+            {/* Tabla izquierda
+                — flex-shrink:1 permite que ceda espacio si la pantalla es angosta
+                — table-layout:fixed + anchos explícitos evitan que "Total" se corte
+            */}
+            <div style={{ flex: '1 1 58%', minWidth: 0, overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: 'auto' }} />
+                  <col style={{ width: 38 }} />
+                  <col style={{ width: 44 }} />
+                  <col style={{ width: 50 }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th style={thBase(BLUE_MED, 'left')}></th>
+                    <th style={thBase(BLUE_MED)}>Dist.</th>
+                    <th style={thBase(BLUE_MED)}>Presenc.</th>
+                    <th style={thBase(BLUE_MED)}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className={visibleStudents[0] ? 'row-animated' : 'row-hidden'}>
+                    <td style={{ ...tdBase('left'), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>1. Pregrado</td>
+                    <td style={tdBase('right')}>{ss.pregradoDistancia}</td>
+                    <td style={tdBase('right')}>{ss.pregradoPresencial}</td>
+                    <td style={tdBase('right', PURPLE, true)}>{ss.pregradoTotal}</td>
+                  </tr>
+                  <tr className={visibleStudents[1] ? 'row-animated' : 'row-hidden'}>
+                    <td style={{ ...tdBase('left'), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>2. Posgrado</td>
+                    <td style={tdBase('right')}>{ss.posgradoDistancia}</td>
+                    <td style={tdBase('right')}>{ss.posgradoPresencial}</td>
+                    <td style={tdBase('right', PURPLE, true)}>{ss.posgradoTotal}</td>
+                  </tr>
+                  <tr
+                    className={visibleStudents[2] ? 'row-animated' : 'row-hidden'}
+                    style={{ backgroundColor: PURPLE, fontWeight: 600 }}
+                  >
+                    <td style={{ ...tdBase('left', PURPLE, true), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Total</td>
+                    <td style={tdBase('right', PURPLE)}>{ss.totalGeneralDistancia}</td>
+                    <td style={tdBase('right', PURPLE)}>{ss.totalGeneralPresencial}</td>
+                    <td style={tdBase('right', PURPLE)}>{ss.totalGeneral}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Panel derecho de iconos
+                — flex: 0 0 auto para que no crezca ni encoja
+                — ancho mínimo garantizado para que los 3 items quepan
+            */}
+            <div style={{
+              flex: '0 0 auto',
+              minWidth: 90,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-evenly',
+              borderLeft: `1px solid ${BLUE}`,
+              paddingLeft: 4,
+              gap: 2,
+            }}>
+              {[
+                { label: 'Total\npoblación', src: '/poblacion.png', value: ss.totalGeneral },
+                { label: 'Hombres',          src: '/hombre.png',    value: ss.hombres },
+                { label: 'Mujeres',          src: '/mujer.png',     value: ss.mujeres },
+              ].map((item, idx, arr) => (
+                <React.Fragment key={item.label}>
+                  <div style={{
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', gap: 1,
+                    minWidth: 0, overflow: 'hidden',
+                  }}>
+                    <span style={{
+                      color: BLUE, fontWeight: 600,
+                      fontSize: 8,
+                      textAlign: 'center',
+                      lineHeight: 1.2,
+                      whiteSpace: 'pre-line',
+                      wordBreak: 'break-word',
+                    }}>
+                      {item.label}
+                    </span>
+                    <img src={item.src} style={{ height: 14, objectFit: 'contain' }} alt={item.label} />
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, color: '#111',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {item.value}
+                    </span>
+                  </div>
+                  {idx < arr.length - 1 && (
+                    <div style={{ width: 1, height: 24, flexShrink: 0, backgroundColor: `${BLUE}44` }} />
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+
+          </div>
+        </Card>
+      </Reveal>
+
+      {/* ══ CONTEXTO ══ */}
+      <Reveal delay={80}>
+        <Card mb={10}>
+          <MBanner>CONTEXTO CENTRO UNIVERSITARIO</MBanner>
+          <img src={contextoSrc} alt="Contexto"
+            style={{ width: '100%', objectFit: 'contain', display: 'block', maxHeight: 270 }} />
+        </Card>
+      </Reveal>
+
+      {/* ══ EBITDA ══ */}
+      <Reveal delay={80}>
+        <Card mb={10}>
+          <MBanner>PROYECCIÓN INGRESOS – COSTOS Y GASTOS – EBITDA</MBanner>
+          <img src={ebitdaSrc} alt="EBITDA" style={{ width: '100%', objectFit: 'contain', display: 'block' }} />
+        </Card>
+      </Reveal>
+
+      {/* ══ INDICADORES ══ */}
+{p1.indicatorsRows.length > 0 && (
+  <Reveal delay={60}>
+    <Card mb={10}>
+      <MBanner>PROYECCIÓN INDICADORES CENTRO UNIVERSITARIO</MBanner>
+      <StickyScrollTable>
+        <thead>
+          <tr>
+            <th style={{
+              ...stickyThBlock(),
+              minWidth: 130,
+              width: 130,
+              whiteSpace: 'normal',
+              lineHeight: 1.3,
+              verticalAlign: 'middle',
+              textAlign: 'left',
+              padding: SC_P,
+            }}>
+              Indicador
+            </th>
+            {años6.map((a) => (
+              <th key={a} style={{
+                border: B,
+                backgroundColor: BLUE_LIGHT,
+                fontWeight: 700,
+                fontSize: SC_FS,
+                textAlign: 'center',
+                padding: SC_P,
+                whiteSpace: 'nowrap',
+                minWidth: 52,
+              }}>
+                {a}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {p1.indicatorsRows.map((row, i) => (
+            <tr key={i} className={visibleIndicators[i] ? 'row-animated' : 'row-hidden'}>
+              {/* Columna sticky con nombre completo */}
+              <td style={{
+                ...stickyTdBlock(i % 2 === 0 ? RED_ROW : '#fde8e7'),
+                color: '#000',
+                fontWeight: 600,
+                minWidth: 130,
+                width: 130,
+                whiteSpace: 'normal',      // ← permite wrap
+                lineHeight: 1.3,
+                verticalAlign: 'middle',
+                padding: SC_P,
+              }}>
+                {row[0]}
+              </td>
+              {/* Columnas de valores */}
+              {row.slice(1).map((cell, j) => (
+                <td key={j} style={{
+                  border: B,
+                  backgroundColor: i % 2 === 0 ? 'white' : '#f5f7fb',
+                  fontSize: SC_FS,
+                  textAlign: 'center',
+                  padding: SC_P,
+                  whiteSpace: 'nowrap',
+                  minWidth: 52,
+                }}>
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </StickyScrollTable>
+    </Card>
+  </Reveal>
+)}
+
+      {/* ══ HEADER PAGE 2 ══ */}
+      <Reveal delay={0}>
+        <Card mb={10}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <img src="/Logo UNIMINUTO.png" alt="Logo" style={{ height: 36, objectFit: 'contain' }} />
+            <div style={{ flex: 1, margin: '0 8px', overflow: 'hidden' }}>
+              <div style={{ backgroundColor: BLUE_LIGHT, clipPath: 'polygon(2% 0%,100% 0%,98% 100%,0% 100%)', padding: '4px 12px', textAlign: 'center' }}>
+                <span style={{ fontSize: 10, fontWeight: 600, color: BLUE, whiteSpace: 'nowrap' }}>{subtitle}</span>
+              </div>
+            </div>
+            <img src="/Logo_Acreditacion.png" alt="Acreditación" style={{ height: 30, objectFit: 'contain' }} />
+          </div>
+          <div style={{ marginTop: 5, textAlign: 'center' }}>
+            <div style={{ display: 'inline-block', backgroundColor: GRAY_BAN, clipPath: 'polygon(1% 0%,100% 0%,99% 100%,0% 100%)', padding: '3px 16px' }}>
+              <span style={{ fontSize: 9, fontWeight: 600, color: '#111' }}>Proyección estudiantes 2026–2030 S1/Q1 por Nivel Académico y Modalidad</span>
+            </div>
+          </div>
+        </Card>
+      </Reveal>
+
+      {/* ══ TABLA 1 — Nivel / Modalidad ══ */}
+      <Reveal delay={60}>
+        <Card mb={10}>
+          <StickyScrollTable>
+            <thead>
+              <tr>
+                <th rowSpan={2} style={{ ...stickyThBlock(), verticalAlign: 'middle' }}>
+                  <StickyInner nivel="Nivel" modalidad="Modalidad" modBold />
+                </th>
+                {YEARS5.map((y) => <th key={y} colSpan={3} style={dataTh}>{y}</th>)}
+              </tr>
+              <tr>
+                {YEARS5.map((y) => (
+                  <React.Fragment key={y}>
+                    {['Nvo', 'Cont', 'Tot'].map((s) => (
+                      <th key={s} style={{ ...dataTh, fontSize: 7 }}>{s}</th>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr className={visibleT1[0] ? 'row-animated' : 'row-hidden'}>
+                <td style={stickyTdBlock()}><StickyInner nivel="1.Preg." modalidad="Presenc." /></td>
+                {p2?.t1_pregPresencial?.map((d: any, i: number) => <YC key={i} d={d} />)}
+              </tr>
+              <tr className={visibleT1[1] ? 'row-animated' : 'row-hidden'}>
+                <td style={stickyTdBlock()}><StickyInner nivel="" modalidad="Distancia" /></td>
+                {p2?.t1_pregDistancia?.map((d: any, i: number) => <YC key={i} d={d} />)}
+              </tr>
+              <tr className={visibleT1[2] ? 'row-animated' : 'row-hidden'}>
+                <td style={stickyTdBlock()}><StickyInner nivel="" modalidad="Total" modBold /></td>
+                {p2?.t1_pregTotal?.map((d: any, i: number) => <YC key={i} d={d} color="#C00000" />)}
+              </tr>
+              <SeparatorRow />
+              <tr className={visibleT1[3] ? 'row-animated' : 'row-hidden'}>
+                <td style={stickyTdBlock()}><StickyInner nivel="2.Posg." modalidad="Presenc." /></td>
+                {p2?.t1_posPresencial?.map((d: any, i: number) => <YC key={i} d={d} />)}
+              </tr>
+              <tr className={visibleT1[4] ? 'row-animated' : 'row-hidden'}>
+                <td style={stickyTdBlock()}><StickyInner nivel="" modalidad="Distancia" /></td>
+                {p2?.t1_posDistancia?.map((d: any, i: number) => <YC key={i} d={d} />)}
+              </tr>
+              <tr className={visibleT1[5] ? 'row-animated' : 'row-hidden'}>
+                <td style={stickyTdBlock()}><StickyInner nivel="" modalidad="Total" modBold /></td>
+                {p2?.t1_posTotal?.map((d: any, i: number) => <YC key={i} d={d} color="#C00000" />)}
+              </tr>
+              <tr className={visibleT1[6] ? 'row-animated' : 'row-hidden'}>
+                <td style={stickyTdBlock(PURPLE2, '#fff')}>
+                  <StickyInner modalidad="Total" nivelBg={PURPLE2} nivelColor="#fff" modBg={PURPLE2} modColor="#000000" modBold />
+                </td>
+                {p2?.t1_grandTotal?.map((d: any, i: number) => <YC key={i} d={d} bg={PURPLE2} color="#000000" />)}
+              </tr>
+            </tbody>
+          </StickyScrollTable>
+        </Card>
+      </Reveal>
+
+      {/* ══ TABLA 2 — Por Modalidad ══ */}
+      <Reveal delay={60}>
+        <Card mb={10}>
+          <StickyScrollTable>
+            <thead>
+              <tr>
+                <th rowSpan={2} style={{ ...stickyThBlock(), verticalAlign: 'middle', textAlign: 'center', padding: SC_P }}>
+                  Modalidad
+                </th>
+                {YEARS5.map((y) => <th key={y} colSpan={3} style={dataTh}>{y}</th>)}
+              </tr>
+              <tr>
+                {YEARS5.map((y) => (
+                  <React.Fragment key={y}>
+                    {['Nvo', 'Cont', 'Tot'].map((s) => (
+                      <th key={s} style={{ ...dataTh, fontSize: 7 }}>{s}</th>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { label: 'Presencial', data: p2?.t2_modPresencial, vis: visibleT2[0] },
+                { label: 'Distancia',  data: p2?.t2_modDistancia,  vis: visibleT2[1] },
+              ].map(({ label, data, vis }) => (
+                <tr key={label} className={vis ? 'row-animated' : 'row-hidden'}>
+                  <td style={{ ...stickyTdBlock(), textAlign: 'center', padding: SC_P, fontWeight: 700 }}>{label}</td>
+                  {data?.map((d: any, i: number) => <YC key={i} d={d} />)}
+                </tr>
+              ))}
+              <tr className={visibleT2[2] ? 'row-animated' : 'row-hidden'}>
+                <td style={{ ...stickyTdBlock(PURPLE2, '#000000'), textAlign: 'center', padding: SC_P, fontWeight: 700 }}>Total</td>
+                {p2?.t2_modTotal?.map((d: any, i: number) => <YC key={i} d={d} bg={PURPLE2} color="#000000" />)}
+              </tr>
+            </tbody>
+          </StickyScrollTable>
+        </Card>
+      </Reveal>
+
+      {/* ══ TABLA 3 — Matrículas 2026 ══ */}
+      <Reveal delay={60}>
+        <Card mb={10}>
+          <MBanner>Matrículas 2026 S1/Q1 — Nivel Académico y Modalidad</MBanner>
+          {(['nuevos', 'continuos', 'totales'] as const).map((tipo) => (
+            <div key={tipo} style={{ marginBottom: 8 }}>
+              <div style={{ backgroundColor: BLUE_LIGHT, border: B, borderRadius: 3, padding: '2px 8px', marginBottom: 4, display: 'inline-block' }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: BLUE, textTransform: 'capitalize' }}>
+                  Estudiantes {tipo}
+                </span>
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...thBase(GREEN_HDR, 'left'), width: '28%' }}>Nivel</th>
+                    <th style={{ ...thBase(GREEN_HDR, 'left'), width: '20%' }}></th>
+                    <th style={thBase(GREEN_HDR)}>Proy.</th>
+                    <th style={thBase(GREEN_HDR)}>Matr.</th>
+                    <th style={thBase(GREEN_HDR)}>Var.</th>
+                    <th style={thBase(GREEN_HDR)}>%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className={visibleT3[0] ? 'row-animated' : 'row-hidden'}>
+                    <td rowSpan={2} style={{ ...tdBase('left', 'white', true), verticalAlign: 'middle' }}>1.Pregrado</td>
+                    <td style={mc('left')}>Presencial</td>
+                    <MatCells d={p2?.t3_matriculas2026?.pregradoPresencial?.[tipo]} isYellow={tipo === 'totales'} />
+                  </tr>
+                  <tr className={visibleT3[1] ? 'row-animated' : 'row-hidden'}>
+                    <td style={mc('left')}>Distancia</td>
+                    <MatCells d={p2?.t3_matriculas2026?.pregradoDistancia?.[tipo]} isYellow={tipo === 'totales'} />
+                  </tr>
+                  <tr className={visibleT3[2] ? 'row-animated' : 'row-hidden'}>
+                    <td colSpan={2} style={mcT('left')}>Total Preg.</td>
+                    <MatCells d={p2?.t3_matriculas2026?.pregradoTotal?.[tipo]} isTotalRow />
+                  </tr>
+                  <tr className={visibleT3[3] ? 'row-animated' : 'row-hidden'}>
+                    <td rowSpan={2} style={{ ...tdBase('left', 'white', true), verticalAlign: 'middle' }}>2.Posgrado</td>
+                    <td style={mc('left')}>Presencial</td>
+                    <MatCells d={p2?.t3_matriculas2026?.posgradoPresencial?.[tipo]} isYellow={tipo === 'totales'} />
+                  </tr>
+                  <tr className={visibleT3[4] ? 'row-animated' : 'row-hidden'}>
+                    <td style={mc('left')}>Distancia</td>
+                    <MatCells d={p2?.t3_matriculas2026?.posgradoDistancia?.[tipo]} isYellow={tipo === 'totales'} />
+                  </tr>
+                  <tr className={visibleT3[5] ? 'row-animated' : 'row-hidden'}>
+                    <td colSpan={2} style={mcT('left')}>Total Posg.</td>
+                    <MatCells d={p2?.t3_matriculas2026?.posgradoTotal?.[tipo]} isTotalRow />
+                  </tr>
+                  <tr className={visibleT3[6] ? 'row-animated' : 'row-hidden'}>
+                    <td colSpan={2} style={{ ...mcT('left'), backgroundColor: PURPLE2, color: '#000000' }}>Total</td>
+                    <MatCells d={p2?.t3_matriculas2026?.totalGeneral?.[tipo]} isTotalRow />
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </Card>
+      </Reveal>
+
+      {/* ══ TABLA 4 — Periodicidad ══ */}
+      <Reveal delay={60}>
+        <Card mb={10}>
+          <MBanner>Proyección estudiantes 2026–2030 por Nivel y Periodicidad</MBanner>
+          <StickyScrollTable>
+            <TableHead />
+            <tbody>
+              <tr className={visibleT4[0] ? 'row-animated' : 'row-hidden'}>
+                <td style={stickyTdBlock()}><StickyInner nivel="1.Preg." modalidad="Semestral" /></td>
+                {p2?.t4_pregSemestral?.map((d: any, i: number) => <YC key={i} d={d} />)}
+              </tr>
+              <tr className={visibleT4[1] ? 'row-animated' : 'row-hidden'}>
+                <td style={stickyTdBlock()}><StickyInner nivel="" modalidad="Cuatrim." /></td>
+                {p2?.t4_pregCuatrimestral?.map((d: any, i: number) => <YC key={i} d={d} />)}
+              </tr>
+              <tr className={visibleT4[2] ? 'row-animated' : 'row-hidden'}>
+                <td style={stickyTdBlock()}><StickyInner nivel="" modalidad="Total" modBold /></td>
+                {p2?.t4_pregTotal?.map((d: any, i: number) => <YC key={i} d={d} color="#C00000" />)}
+              </tr>
+              <SeparatorRow />
+              <tr className={visibleT4[3] ? 'row-animated' : 'row-hidden'}>
+                <td style={stickyTdBlock()}><StickyInner nivel="2.Posg." modalidad="Semestral" /></td>
+                {p2?.t4_posSemestral?.map((d: any, i: number) => <YC key={i} d={d} />)}
+              </tr>
+              <tr className={visibleT4[4] ? 'row-animated' : 'row-hidden'}>
+                <td style={stickyTdBlock()}><StickyInner nivel="" modalidad="Cuatrim." /></td>
+                {p2?.t4_posCuatrimestral?.map((d: any, i: number) => <YC key={i} d={d} />)}
+              </tr>
+              <tr className={visibleT4[5] ? 'row-animated' : 'row-hidden'}>
+                <td style={stickyTdBlock()}><StickyInner nivel="" modalidad="Total" modBold /></td>
+                {p2?.t4_posTotal?.map((d: any, i: number) => <YC key={i} d={d} color="#C00000" />)}
+              </tr>
+              <tr className={visibleT4[6] ? 'row-animated' : 'row-hidden'}>
+                <td style={stickyTdBlock(PURPLE2, '#fff')}>
+                  <StickyInner modalidad="Total" nivelBg={PURPLE2} nivelColor="#fff" modBg={PURPLE2} modColor="#000000" modBold />
+                </td>
+                {p2?.t4_grandTotal?.map((d: any, i: number) => <YC key={i} d={d} bg={PURPLE2} color="#000000" />)}
+              </tr>
+            </tbody>
+          </StickyScrollTable>
+        </Card>
+      </Reveal>
+
+      {/* ══ OFERTA ACADÉMICA ══ */}
+      {p2?.graficaOferta && (
+        <Reveal delay={60}>
+          <Card mb={10}>
+            <MBanner>Proyección Oferta Académica</MBanner>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{ ...thBase(BLUE_LIGHT, 'left'), width: '30%' }}>Periodicidad</th>
+                  {YEARS5.map((y) => <th key={y} style={thBase(BLUE_LIGHT)}>{y}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { label: '1.Pregrado', data: p2.graficaOferta.pregrado,             bold: true },
+                  { label: '  Presencial',  data: p2.graficaOferta.pregradoSemestral,     bold: false },
+                  { label: '  Distancia',   data: p2.graficaOferta.pregradoCuatrimestral, bold: false },
+                  { label: '2.Posgrado', data: p2.graficaOferta.posgrado,             bold: true },
+                  { label: '  Presencial',  data: p2.graficaOferta.posgradoSemestral,     bold: false },
+                  { label: '  Distancia',   data: p2.graficaOferta.posgradoCuatrimestral, bold: false },
+                  {
+                    label: 'Total',
+                    data: (p2.graficaOferta.pregrado || []).map((_: any, i: number) =>
+                      Number(p2.graficaOferta.pregrado?.[i] ?? 0) + Number(p2.graficaOferta.posgrado?.[i] ?? 0)
+                    ),
+                    bold: true,
+                    isTotal: true,
+                  },
+                ].map((row, i) => (
+                  <tr
+                    key={i}
+                    style={{
+                      backgroundColor: row.isTotal ? undefined : i % 2 === 0 ? 'white' : '#f5f7fb',
+                    }}
+                  >
+                    <td
+                      style={{
+                        ...tdBase('left', 'inherit', row.bold),
+                        whiteSpace: 'pre',
+                        ...(row.isTotal && { backgroundColor: '#9977bd', color: '#000000' }),
+                      }}
+                    >
+                      {row.label}
+                    </td>
+                    {(row.data || []).map((v: any, j: number) => (
+                      <td
+                        key={j}
+                        style={{
+                          ...tdBase('center', 'inherit', row.bold),
+                          ...(row.isTotal && { backgroundColor: '#9977bd', color: '#000000' }),
+                        }}
+                      >
+                        {v}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        </Reveal>
+      )}
+
+      {/* ══ DESERCIÓN ══ */}
+      {p2?.graficaDesercion && (
+        <Reveal delay={60}>
+          <Card mb={10}>
+            <MBanner>Proyección Deserción por Centro Universitario</MBanner>
+            <DesercionChart data={p2.graficaDesercion} />
+          </Card>
+        </Reveal>
+      )}
+
+      {/* ══ LÍNEAS ══ */}
+      {p2?.graficaLineas && (
+        <Reveal delay={60}>
+          <Card mb={10}>
+            <MBanner>Proyección estudiantes por modalidad S1-Q1</MBanner>
+            <LineasChart data={p2.graficaLineas} />
+          </Card>
+        </Reveal>
+      )}
+
+      <div style={{ height: 16 }} />
+    </div>
+  );
+}
